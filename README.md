@@ -109,95 +109,138 @@ facial-recognition-system/
 
 ## Setup Instructions
 
-### Prerequisites
-- Docker and Docker Compose
-- Python 3.10+ (for local development)
-- Node.js 18+ (for frontend development)
+### System Requirements
+- Ubuntu 20.04+ or similar Linux distribution
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 12+
+- Nginx
+- At least 4GB RAM and 20GB disk space
 
-### Quick Start with Docker
+### Production Setup (Recommended)
 
-1. **Clone the repository**
+1. **Prepare the server**
    ```bash
-   git clone <repository-url>
+   # Clone the repository to your server
+   git clone <your-repository-url>
    cd facial-recognition-system
    ```
 
-2. **Configure environment**
+2. **Run the setup script**
    ```bash
+   # Make setup script executable
+   chmod +x setup.sh
+   
+   # Run setup (will install all dependencies and configure services)
+   ./setup.sh
+   ```
+
+3. **Access the application**
+   ```bash
+   # The application will be available at:
+   # http://your-server-ip
+   
+   # Default login credentials:
+   # Username: admin
+   # Password: admin123
+   ```
+
+### Development Setup
+
+1. **Quick development start**
+   ```bash
+   # Clone repository
+   git clone <your-repository-url>
+   cd facial-recognition-system
+   
+   # Copy environment template
    cp .env.example .env
-   # Edit .env with your settings
+   # Edit .env with your database settings
+   
+   # Start development servers
+   chmod +x start.sh
+   ./start.sh
    ```
 
-3. **Start the application**
+2. **Manual development setup**
    ```bash
-   docker-compose up -d
+   # Backend setup
+   python3.10 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   
+   # Frontend setup
+   cd frontend
+   npm install
+   cd ..
+   
+   # Start backend
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   
+   # Start frontend (in another terminal)
+   cd frontend && npm run dev
    ```
 
-4. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - API Documentation: http://localhost:8000/docs
+### Database Setup
 
-5. **Default login credentials**
-   - Username: `admin`
-   - Password: `admin123`
-
-### Local Development Setup
-
-#### Backend Setup
+#### PostgreSQL Installation and Configuration
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Install PostgreSQL
+sudo apt update
+sudo apt install postgresql postgresql-contrib
 
-# Install dependencies
+# Create database and user
+sudo -u postgres psql -c "CREATE DATABASE face_tracking;"
+sudo -u postgres psql -c "CREATE USER face_user WITH PASSWORD 'your_password';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE face_tracking TO face_user;"
+
+# Update .env file with database credentials
+```
+
+## Deployment and Management
+
+### Service Management
+```bash
+# Check service status
+sudo systemctl status facial-recognition-backend
+sudo systemctl status nginx
+
+# Restart services
+sudo systemctl restart facial-recognition-backend
+sudo systemctl restart nginx
+
+# View logs
+sudo journalctl -u facial-recognition-backend -f
+sudo tail -f /var/log/nginx/error.log
+```
+
+### Updates and Deployment
+```bash
+# Deploy updates
+chmod +x deploy.sh
+./deploy.sh
+
+# Or manually:
+cd /opt/facial-recognition
+git pull  # if using git
+source venv/bin/activate
 pip install -r requirements.txt
-
-# Set environment variables
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_NAME=face_tracking
-export DB_USER=postgres
-export DB_PASSWORD=password
-export SECRET_KEY=your-secret-key
-
-# Run the application
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cd frontend && npm run build && cd ..
+sudo systemctl restart facial-recognition-backend
 ```
 
-#### Frontend Setup
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Set environment variables
-echo "VITE_API_URL=http://localhost:8000" > .env
-
-# Start development server
-npm run dev
-```
-
-#### Database Setup
-```bash
-# Start PostgreSQL (using Docker)
-docker run -d \
-  --name postgres-face-recognition \
-  -e POSTGRES_DB=face_tracking \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=password \
-  -p 5432:5432 \
-  postgres:15
-
-# Database tables will be created automatically on first run
-```
+### File Locations
+- **Application**: `/opt/facial-recognition/`
+- **Logs**: `/opt/facial-recognition/logs/` and `journalctl -u facial-recognition-backend`
+- **Uploads**: `/opt/facial-recognition/uploads/`
+- **Nginx Config**: `/etc/nginx/sites-available/facial-recognition`
+- **Service Config**: `/etc/systemd/system/facial-recognition-backend.service`
 
 ## API Documentation
 
 The API documentation is automatically generated and available at:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://your-server-ip/api/docs
+- ReDoc: http://your-server-ip/api/redoc
 
 ### Key Endpoints
 
@@ -246,52 +289,43 @@ The API documentation is automatically generated and available at:
 
 ## Deployment
 
-### Production Deployment
+### Production Configuration
 
-1. **Update environment variables**
+1. **Security Configuration**
    ```bash
-   # Set production values
-   export DEBUG=False
-   export SECRET_KEY=your-production-secret-key
-   export DB_PASSWORD=secure-production-password
+   # Edit /opt/facial-recognition/.env
+   DEBUG=False
+   SECRET_KEY=your-secure-secret-key
+   DB_PASSWORD=secure-database-password
    ```
 
-2. **Build and deploy**
+2. **SSL/HTTPS Setup** (Recommended)
    ```bash
-   docker-compose -f docker-compose.prod.yml up -d
+   # Install Certbot for Let's Encrypt
+   sudo apt install certbot python3-certbot-nginx
+   
+   # Get SSL certificate
+   sudo certbot --nginx -d your-domain.com
    ```
 
-3. **Set up reverse proxy** (nginx example)
-   ```nginx
-   server {
-       listen 80;
-       server_name your-domain.com;
-       
-       location / {
-           proxy_pass http://localhost:3000;
-       }
-       
-       location /api {
-           proxy_pass http://localhost:8000;
-       }
-       
-       location /api/camera/feed {
-           proxy_pass http://localhost:8000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection "upgrade";
-       }
-   }
+3. **Firewall Configuration**
+   ```bash
+   # Configure UFW firewall
+   sudo ufw allow ssh
+   sudo ufw allow 'Nginx Full'
+   sudo ufw enable
    ```
 
 ### Security Considerations
 
 - Change default passwords
 - Use strong JWT secret keys
-- Enable HTTPS in production
+- Enable HTTPS with SSL certificates
 - Configure firewall rules
 - Regular security updates
 - Database access restrictions
+- Limit file upload sizes
+- Regular backup procedures
 
 ## Troubleshooting
 
@@ -319,10 +353,28 @@ The API documentation is automatically generated and available at:
 
 ### Logs and Monitoring
 
-- Application logs: `logs/app.log`
-- Database logs: Check PostgreSQL logs
-- System logs: Available through admin interface
-- Performance monitoring: Built-in metrics in admin dashboard
+- **Application logs**: 
+  ```bash
+  sudo journalctl -u facial-recognition-backend -f
+  tail -f /opt/facial-recognition/logs/app.log
+  ```
+- **Nginx logs**: 
+  ```bash
+  sudo tail -f /var/log/nginx/access.log
+  sudo tail -f /var/log/nginx/error.log
+  ```
+- **Database logs**: 
+  ```bash
+  sudo tail -f /var/log/postgresql/postgresql-*.log
+  ```
+- **System monitoring**: Available through admin interface
+
+### Performance Optimization
+
+- **Database**: Regular VACUUM and ANALYZE operations
+- **File Storage**: Regular cleanup of old uploaded files
+- **Memory**: Monitor memory usage, especially for face recognition operations
+- **CPU**: Consider GPU acceleration for face recognition if available
 
 ## Contributing
 
